@@ -1,0 +1,1390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LINUS REVIEWS YOUR CODE</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #030803;
+      color: #00ff41;
+      font-family: 'Fira Code', 'Courier New', Courier, monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* CRT scanlines overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.09) 2px,
+        rgba(0, 0, 0, 0.09) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* CRT vignette */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.55) 100%);
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0; }
+    }
+
+    @keyframes waveBar {
+      0%, 100% { transform: scaleY(0.3); opacity: 0.5; }
+      50%       { transform: scaleY(1.0); opacity: 1;   }
+    }
+
+    @keyframes flicker {
+      0%, 95%, 100% { opacity: 1;    }
+      96%            { opacity: 0.85; }
+      97%            { opacity: 1;    }
+      98%            { opacity: 0.9;  }
+    }
+
+    .blink    { animation: blink 1s step-end infinite; }
+    .flicker  { animation: flicker 8s ease-in-out infinite; }
+
+    /* Blinking block cursor appended to review text */
+    .cursor-blink::after {
+      content: '█';
+      animation: blink 0.75s step-end infinite;
+      color: #00ff41;
+    }
+
+    /* Equaliser bars for speaking indicator */
+    .eq-bar {
+      display: inline-block;
+      width: 3px;
+      background: #00ff41;
+      border-radius: 1px;
+      animation: waveBar 0.5s ease-in-out infinite;
+      transform-origin: bottom center;
+    }
+
+    textarea, input[type="password"], input[type="email"] {
+      background: transparent;
+      color: #00ff41;
+      font-family: 'Fira Code', 'Courier New', monospace;
+      caret-color: #00ff41;
+    }
+
+    textarea::placeholder, input::placeholder { color: #1c4d22; }
+    textarea:focus, input:focus { outline: none; }
+
+    ::-webkit-scrollbar          { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track    { background: #030803; }
+    ::-webkit-scrollbar-thumb    { background: #004d00; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00aa22; }
+
+    .btn-roast {
+      font-family: 'Fira Code', 'Courier New', monospace;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      transition: box-shadow 0.1s ease, background 0.1s ease;
+      cursor: pointer;
+    }
+    .btn-roast:not(:disabled):hover {
+      box-shadow: 0 0 35px rgba(220, 0, 0, 0.55), inset 0 0 20px rgba(180, 0, 0, 0.15);
+    }
+    .btn-roast:active:not(:disabled) { transform: scale(0.99); }
+
+    .glow-green {
+      text-shadow:
+        0 0 8px  rgba(0, 255, 65, 0.9),
+        0 0 24px rgba(0, 255, 65, 0.5),
+        0 0 60px rgba(0, 255, 65, 0.2);
+    }
+
+    .panel {
+      border: 1px solid #004400;
+      background: #010d01;
+    }
+
+    .panel-hot {
+      border: 1px solid #00ff41;
+      background: linear-gradient(180deg, #011201 0%, #030803 100%);
+      box-shadow: 0 0 24px rgba(0, 255, 65, 0.06);
+    }
+
+    /* Smooth highlight on currently-active kernel message */
+    .kmsg-active {
+      color: #00dd33 !important;
+      text-shadow: 0 0 8px rgba(0, 221, 51, 0.55);
+      transition: color 0.25s, text-shadow 0.25s;
+    }
+    .kmsg-inactive {
+      color: #002200 !important;
+      transition: color 0.4s;
+    }
+
+    /* ── Solution panel — amber theme ── */
+    .cursor-blink-amber::after {
+      content: '█';
+      animation: blink 0.75s step-end infinite;
+      color: #ffb300;
+    }
+
+    .kmsg-active-amber {
+      color: #ffaa00 !important;
+      text-shadow: 0 0 8px rgba(255, 170, 0, 0.5);
+      transition: color 0.25s, text-shadow 0.25s;
+    }
+    .kmsg-inactive-amber {
+      color: #2a1a00 !important;
+      transition: color 0.4s;
+    }
+
+    .panel-amber {
+      border: 1px solid #ffb300;
+      background: linear-gradient(180deg, #100d00 0%, #080500 100%);
+      box-shadow: 0 0 28px rgba(255, 179, 0, 0.07);
+    }
+
+    .btn-fix {
+      font-family: 'Fira Code', 'Courier New', monospace;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      transition: box-shadow 0.15s ease, background 0.15s ease;
+      cursor: pointer;
+    }
+    .btn-fix:not(:disabled):hover {
+      box-shadow: 0 0 28px rgba(255, 179, 0, 0.4), inset 0 0 16px rgba(255, 140, 0, 0.1);
+    }
+    .btn-fix:active:not(:disabled) { transform: scale(0.99); }
+
+    .section-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 4px 0 20px;
+      color: #2a2a00;
+      font-size: 10px;
+      letter-spacing: 2px;
+    }
+    .section-divider::before,
+    .section-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, #2a2a00);
+    }
+    .section-divider::after {
+      background: linear-gradient(90deg, #2a2a00, transparent);
+    }
+
+    .code-scroll {
+      overflow-x: hidden;
+      overflow-y: auto;
+      max-height: 480px;
+    }
+    .code-scroll::-webkit-scrollbar { width: 4px; }
+    .code-scroll::-webkit-scrollbar-track { background: #080500; }
+    .code-scroll::-webkit-scrollbar-thumb { background: #4d3800; border-radius: 2px; }
+
+    @keyframes copied-fade {
+      0%   { opacity: 1; }
+      70%  { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    .copied-toast {
+      animation: copied-fade 1.8s ease forwards;
+    }
+  </style>
+  <script type="module" crossorigin src="/assets/index-DEbeR6Te.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef, useCallback } = React;
+
+    /* ─────────────────────────────────────────────────────────────────────────
+       Constants
+    ──────────────────────────────────────────────────────────────────────────*/
+    const KERNEL_MSGS = [
+      '[ 0.000000] Initializing code review subsystem...',
+      '[ 0.000312] Loading contempt module...',
+      '[ 0.001204] Mounting opinions at /dev/linus...',
+      '[ 0.002100] Calibrating disappointment threshold...',
+      '[ 0.003456] Importing 30 years of C expertise...',
+      '[ 0.004789] Allocating memory for profanity buffer...',
+      '[ 0.006023] git blame --psychological-damage in progress...',
+      '[ 0.007301] Mounting /dev/patience ... [FAILED]',
+      '[ 0.008500] WARNING: Code quality critically below threshold',
+      '[ 0.009900] Loading /proc/your_mistakes ...',
+      '[ 0.011200] Attaching debugger to developer ego...',
+    ];
+
+    const LINUS_QUOTES = [
+      '"Talk is cheap. Show me the code."',
+      '"Bad programmers worry about the code. Good programmers worry about data structures and their relationships."',
+      '"Software is like sex: it\'s better when it\'s free."',
+      '"Theory and practice sometimes clash. And when that happens, theory loses. Every single time."',
+      '"Intelligence is the ability to avoid doing work, yet getting the work done."',
+      '"If you think your users are idiots, only idiots will use it."',
+      '"Most good programmers do programming not because they expect to get paid, but because it is fun to program."',
+      '"The Linux philosophy is \'Laugh in the face of danger\'. Oops. Wrong one. \'Do it yourself\'. Yes, that\'s it."',
+      '"An individual developer like me cares about the technology, not the religion around it."',
+    ];
+
+    const SYSTEM_PROMPT =
+      `You are Linus Torvalds reviewing someone's code. You are brilliant, direct, and brutally honest. ` +
+      `You have zero patience for bad abstractions, unnecessary complexity, memory leaks, or code that looks ` +
+      `like it was written by someone who learned to program from a YouTube tutorial. You care deeply about ` +
+      `correctness, performance, and simplicity. You reference real things: the Linux kernel, git, C, real ` +
+      `hardware. You occasionally swear mildly (damn, hell, crap, garbage, idiotic). You do NOT soften your ` +
+      `feedback. You do NOT say 'great job' or 'good effort.' If the code is genuinely decent, you say so ` +
+      `reluctantly and briefly, then find something to criticize anyway. Keep reviews to 150-200 words. ` +
+      `Start directly with your reaction — no intro like 'Let me review this.' Just react.`;
+
+    const SOLUTION_MSGS = [
+      '[ 0.000000] Discarding your approach entirely...',
+      '[ 0.000741] Removing unnecessary abstraction layers...',
+      '[ 0.001880] Eliminating memory leaks and undefined behavior...',
+      '[ 0.003100] Applying 30 years of systems programming...',
+      '[ 0.004600] Stripping bloat — target: elegance...',
+      '[ 0.006200] Rewriting in idiomatic, correct form...',
+      '[ 0.007900] git commit -m "fixed the garbage" in progress...',
+      '[ 0.009400] Running mental valgrind...',
+      '[ 0.011000] Compiling with -Wall -Wextra -Werror...',
+    ];
+
+    const SOLUTION_PROMPT =
+      `You are Linus Torvalds. You've just torn apart someone's code and now you're going to show them ` +
+      `how it should actually be done. Rewrite the code to be correct, lean, and elegant. Remove unnecessary ` +
+      `abstractions, fix logic errors, eliminate bloat, use proper patterns for the language. ` +
+      `After the improved code, add a single blank line then a comment block (using the language's comment ` +
+      `syntax) of exactly 2-3 sentences — in Linus's direct voice — naming the most important things you ` +
+      `changed and why. Stay in character: direct, no praise, no preamble. ` +
+      `Output ONLY the improved code and the comment. No markdown fences. No 'here is my solution'. Just the code.`;
+
+    /* ─────────────────────────────────────────────────────────────────────────
+       Language detection
+    ──────────────────────────────────────────────────────────────────────────*/
+    function detectLanguage(src) {
+      if (!src.trim()) return null;
+      if (/^\s*<\?php/m.test(src))                                                       return 'PHP';
+      if (/#include\s*[<"]|int\s+main\s*\(|printf\s*\(|malloc\s*\(/.test(src)) {
+        return /std::|cout\s*<<|vector\s*<|namespace\s+\w+/.test(src) ? 'C++' : 'C';
+      }
+      if (/^\s*(fn |pub fn |use |impl |struct |enum |let mut |#\[derive)/m.test(src))    return 'Rust';
+      if (/^\s*(func |package main\b|:=|fmt\.Print)/m.test(src))                        return 'Go';
+      if (/^\s*(def |from .+ import|class \w+.*:\s*$|if __name__\s*==)/m.test(src))     return 'Python';
+      if (/\bpublic\s+class\b|\bSystem\.out\.print|\bimport\s+java\./.test(src))        return 'Java';
+      if (/^\s*(SELECT|INSERT INTO|UPDATE .+SET|DELETE FROM|CREATE TABLE)/im.test(src)) return 'SQL';
+      if (/\buseState\b|\buseEffect\b|React\.|<[A-Z][a-zA-Z]*[\s/>]/.test(src))        return 'React/JSX';
+      if (/:\s*(string|number|boolean|any|void)\b|interface\s+\w+\s*\{/.test(src))     return 'TypeScript';
+      if (/\b(const|let|var|function|=>|async|await|require\(|module\.exports)\b/.test(src)) return 'JavaScript';
+      if (/^[\[{]/.test(src.trim()) && /[}\]]$/.test(src.trim()))                       return 'JSON';
+      if (/^---\n|^\s{2,}- \w|\bkey:\s|\bvalue:\s/.test(src))                          return 'YAML';
+      if (/^\s*(<[a-zA-Z]|<!DOCTYPE)/m.test(src))                                       return 'HTML';
+      if (/^\s*(def |module |end$|class \w+ < )/m.test(src))                            return 'Ruby';
+      return 'Unknown';
+    }
+
+    /* ─────────────────────────────────────────────────────────────────────────
+       Supabase auth
+    ──────────────────────────────────────────────────────────────────────────*/
+    function AuthForm() {
+      const [email, setEmail]    = useState('');
+      const [password, setPassword] = useState('');
+      const [msg, setMsg]        = useState('');
+      const [loading, setLoading] = useState(false);
+      const [quote] = useState(() => LINUS_QUOTES[Math.floor(Math.random() * LINUS_QUOTES.length)]);
+
+      const handleSignIn = async () => {
+        setMsg('');
+        if (!email.trim() || !password) { setMsg('Email and password required.'); return; }
+        setLoading(true);
+        const { error } = await window.supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        setLoading(false);
+        if (error) setMsg(error.message);
+      };
+
+      const handleSignUp = async () => {
+        setMsg('');
+        if (!email.trim() || !password) { setMsg('Email and password required.'); return; }
+        if (password.length < 6) { setMsg('Password must be at least 6 characters.'); return; }
+        setLoading(true);
+        const { error } = await window.supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: { emailRedirectTo: window.location.origin },
+        });
+        setLoading(false);
+        if (error) setMsg(error.message);
+        else setMsg('If sign-ups are enabled, check your email to confirm — then sign in.');
+      };
+
+      return (
+        <div className="flicker" style={{
+          minHeight: '100vh',
+          background: '#030803',
+          maxWidth: '480px',
+          margin: '0 auto',
+          padding: '28px 20px 60px',
+        }}>
+          <header style={{
+            border: '2px solid #00ff41',
+            background: 'linear-gradient(180deg, #011601 0%, #010d01 100%)',
+            padding: '20px 22px',
+            marginBottom: '24px',
+            textAlign: 'center',
+            boxShadow: '0 0 40px rgba(0, 255, 65, 0.1)',
+          }}>
+            <p style={{ color: '#006600', fontSize: '10px', letterSpacing: '2px', margin: '0 0 8px' }}>
+              AUTH REQUIRED — NO ANONYMOUS KERNEL ACCESS
+            </p>
+            <h1 className="glow-green" style={{
+              color: '#00ff41',
+              fontSize: 'clamp(16px, 4vw, 28px)',
+              fontWeight: 700,
+              letterSpacing: '4px',
+              margin: 0,
+            }}>
+              SUPABASE LOGIN
+            </h1>
+          </header>
+
+          <div className="panel-hot" style={{ padding: '22px 20px', marginBottom: '20px' }}>
+            <div style={{ color: '#004d00', fontSize: '10px', marginBottom: '16px', letterSpacing: '1px' }}>
+              supabase.auth — email + password
+            </div>
+
+            <label style={{ display: 'block', color: '#005500', fontSize: '11px', marginBottom: '6px' }}>email</label>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              autoComplete="email"
+              placeholder="you@kernel.dev"
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                marginBottom: '14px',
+                background: '#070d07',
+                border: '1px solid #003300',
+                fontFamily: 'inherit',
+                fontSize: '13px',
+              }}
+              onFocus={e => { e.target.style.borderColor = '#00aa22'; }}
+              onBlur={e  => { e.target.style.borderColor = '#003300'; }}
+            />
+
+            <label style={{ display: 'block', color: '#005500', fontSize: '11px', marginBottom: '6px' }}>password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              autoComplete="current-password"
+              placeholder="••••••••"
+              disabled={loading}
+              style={{
+                width: '100%',
+                padding: '10px 12px',
+                marginBottom: '14px',
+                background: '#070d07',
+                border: '1px solid #003300',
+                fontFamily: 'inherit',
+                fontSize: '13px',
+              }}
+              onFocus={e => { e.target.style.borderColor = '#00aa22'; }}
+              onBlur={e  => { e.target.style.borderColor = '#003300'; }}
+            />
+
+            {msg && (
+              <div style={{
+                color: msg.includes('check your email') || msg.includes('confirm') ? '#00aa44' : '#ff6666',
+                fontSize: '12px',
+                marginBottom: '14px',
+                lineHeight: 1.5,
+              }}>
+                {msg}
+              </div>
+            )}
+
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                onClick={handleSignIn}
+                disabled={loading}
+                className="btn-roast"
+                style={{
+                  flex: '1 1 140px',
+                  padding: '12px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  background: loading ? '#160000' : '#0d330d',
+                  color: loading ? '#551111' : '#00ff41',
+                  border: `2px solid ${loading ? '#3a0000' : '#006600'}`,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {loading ? '[ ... ]' : '[ SIGN IN ]'}
+              </button>
+              <button
+                type="button"
+                onClick={handleSignUp}
+                disabled={loading}
+                className="btn-roast"
+                style={{
+                  flex: '1 1 140px',
+                  padding: '12px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  background: loading ? '#161616' : '#0a0a12',
+                  color: loading ? '#444' : '#88ff88',
+                  border: `2px solid ${loading ? '#333' : '#004400'}`,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                }}
+              >
+                [ CREATE ACCOUNT ]
+              </button>
+            </div>
+          </div>
+
+          <footer style={{
+            borderTop: '1px solid #002200',
+            paddingTop: '16px',
+            textAlign: 'center',
+            color: '#1c4d1c',
+            fontSize: '11px',
+          }}>
+            <span style={{ fontStyle: 'italic' }}>{quote}</span>
+          </footer>
+        </div>
+      );
+    }
+
+    function Root() {
+      const [session, setSession] = useState(null);
+      const [ready, setReady]     = useState(false);
+
+      useEffect(() => {
+        const sb = window.supabase;
+        if (!sb) {
+          setReady(true);
+          return;
+        }
+        sb.auth.getSession().then(({ data: { session: s } }) => {
+          setSession(s);
+          setReady(true);
+        });
+        const { data: { subscription } } = sb.auth.onAuthStateChange((_event, s) => setSession(s));
+        return () => subscription.unsubscribe();
+      }, []);
+
+      if (!ready) {
+        return (
+          <div style={{
+            minHeight: '100vh',
+            background: '#030803',
+            color: '#003300',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontFamily: 'inherit',
+          }}>
+            <span className="blink" style={{ color: '#00ff41' }}>█</span>
+            <span style={{ marginLeft: '8px', fontSize: '12px', letterSpacing: '2px' }}>authenticating...</span>
+          </div>
+        );
+      }
+
+      if (!window.supabase) {
+        return (
+          <div style={{
+            minHeight: '100vh',
+            background: '#030803',
+            color: '#ccaaaa',
+            padding: '40px 24px',
+            maxWidth: '560px',
+            margin: '0 auto',
+            fontSize: '13px',
+            lineHeight: 1.75,
+            fontFamily: 'inherit',
+          }}>
+            <p style={{ color: '#00ff41', fontSize: '15px', marginBottom: '14px' }}>Supabase not configured</p>
+            <p style={{ marginBottom: '12px' }}>
+              Copy <span style={{ color: '#00aa22' }}>.env.example</span> to <span style={{ color: '#00aa22' }}>.env</span> and set{' '}
+              <span style={{ color: '#00aa22' }}>VITE_SUPABASE_URL</span> and{' '}
+              <span style={{ color: '#00aa22' }}>VITE_SUPABASE_ANON_KEY</span> from your Supabase project (Settings → API), then restart the dev server.
+            </p>
+          </div>
+        );
+      }
+
+      if (!session) return <AuthForm />;
+
+      return (
+        <App
+          session={session}
+          onSignOut={() => window.supabase.auth.signOut()}
+        />
+      );
+    }
+
+    /* ─────────────────────────────────────────────────────────────────────────
+       App
+    ──────────────────────────────────────────────────────────────────────────*/
+    function App({ session, onSignOut }) {
+      const [apiKey,    setApiKey]    = useState('');
+      const [code,      setCode]      = useState('');
+      const [review,    setReview]    = useState('');
+      const [loading,   setLoading]   = useState(false);
+      const [kernelIdx, setKernelIdx] = useState(0);
+      const [speaking,  setSpeaking]  = useState(false);
+      const [done,      setDone]      = useState(false);
+      const [error,     setError]     = useState('');
+      const [quote]  = useState(() => LINUS_QUOTES[Math.floor(Math.random() * LINUS_QUOTES.length)]);
+
+      const [solution,    setSolution]    = useState('');
+      const [solLoading,  setSolLoading]  = useState(false);
+      const [solDone,     setSolDone]     = useState(false);
+      const [solError,    setSolError]    = useState('');
+      const [solKernelIdx,setSolKernelIdx]= useState(0);
+      const [copied,      setCopied]      = useState(false);
+
+      const lang      = code.trim() ? detectLanguage(code) : null;
+      const lineCount = Math.max(code.split('\n').length, 15);
+
+      /* Refs for streaming typewriter */
+      const bufRef       = useRef('');   // full accumulated API text
+      const shownRef     = useRef(0);    // chars already displayed
+      const typeTimer    = useRef(null);
+      const kernelTimer  = useRef(null);
+      const lineNumsRef  = useRef(null);
+      const textareaRef  = useRef(null);
+
+      const solBufRef    = useRef('');
+      const solShownRef  = useRef(0);
+      const solTypeTimer = useRef(null);
+      const solKernelTimer = useRef(null);
+      const solPanelRef  = useRef(null);
+
+      /* Sync line-numbers scroll with textarea */
+      const syncScroll = () => {
+        if (lineNumsRef.current && textareaRef.current)
+          lineNumsRef.current.scrollTop = textareaRef.current.scrollTop;
+      };
+
+      /* Typewriter: tick 2 chars every 12 ms ≈ 167 chars/sec */
+      const startTypewriter = useCallback(() => {
+        if (typeTimer.current) return;
+        typeTimer.current = setInterval(() => {
+          if (shownRef.current < bufRef.current.length) {
+            shownRef.current = Math.min(shownRef.current + 2, bufRef.current.length);
+            setReview(bufRef.current.slice(0, shownRef.current));
+          }
+        }, 12);
+      }, []);
+
+      const flushTypewriter = useCallback(() => {
+        clearInterval(typeTimer.current);
+        typeTimer.current = null;
+        shownRef.current  = bufRef.current.length;
+        setReview(bufRef.current);
+        setDone(true);
+        setLoading(false);
+      }, []);
+
+      const startSolTypewriter = useCallback(() => {
+        if (solTypeTimer.current) return;
+        solTypeTimer.current = setInterval(() => {
+          if (solShownRef.current < solBufRef.current.length) {
+            solShownRef.current = Math.min(solShownRef.current + 3, solBufRef.current.length);
+            setSolution(solBufRef.current.slice(0, solShownRef.current));
+          }
+        }, 10);
+      }, []);
+
+      const flushSolTypewriter = useCallback(() => {
+        clearInterval(solTypeTimer.current);
+        solTypeTimer.current = null;
+        solShownRef.current  = solBufRef.current.length;
+        setSolution(solBufRef.current);
+        setSolDone(true);
+        setSolLoading(false);
+      }, []);
+
+      const handleSuggestSolution = async () => {
+        if (!code.trim() || !apiKey.trim()) return;
+
+        setSolError('');
+        setSolLoading(true);
+        setSolDone(false);
+        setSolution('');
+        solBufRef.current   = '';
+        solShownRef.current = 0;
+
+        setTimeout(() => solPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+
+        let ski = 0;
+        setSolKernelIdx(0);
+        solKernelTimer.current = setInterval(() => {
+          ski = (ski + 1) % SOLUTION_MSGS.length;
+          setSolKernelIdx(ski);
+        }, 500);
+
+        try {
+          const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type':                              'application/json',
+              'x-api-key':                                 apiKey,
+              'anthropic-version':                         '2023-06-01',
+              'anthropic-dangerous-direct-browser-access': 'true',
+            },
+            body: JSON.stringify({
+              model:      'claude-sonnet-4-20250514',
+              max_tokens: 1024,
+              stream:     true,
+              system:     SOLUTION_PROMPT,
+              messages: [{
+                role:    'user',
+                content: lang
+                  ? `Here is the ${lang} code. Rewrite it properly:\n\n${code}`
+                  : `Here is the code. Rewrite it properly:\n\n${code}`,
+              }],
+            }),
+          });
+
+          clearInterval(solKernelTimer.current);
+
+          if (!res.ok) {
+            let msg = `HTTP ${res.status}`;
+            try { const e = await res.json(); msg = e.error?.message || msg; } catch {}
+            throw new Error(msg);
+          }
+
+          setSolLoading(false);
+          startSolTypewriter();
+
+          const reader  = res.body.getReader();
+          const decoder = new TextDecoder();
+          let   partial = '';
+
+          while (true) {
+            const { done: eof, value } = await reader.read();
+            if (eof) break;
+            partial += decoder.decode(value, { stream: true });
+            const lines = partial.split('\n');
+            partial = lines.pop();
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              const raw = line.slice(6).trim();
+              if (raw === '[DONE]') continue;
+              try {
+                const j = JSON.parse(raw);
+                if (j.type === 'content_block_delta' && j.delta?.type === 'text_delta')
+                  solBufRef.current += j.delta.text;
+              } catch {}
+            }
+          }
+
+          const waitThenFlushSol = () => {
+            if (solShownRef.current >= solBufRef.current.length) flushSolTypewriter();
+            else setTimeout(waitThenFlushSol, 80);
+          };
+          waitThenFlushSol();
+
+        } catch (err) {
+          clearInterval(solKernelTimer.current);
+          clearInterval(solTypeTimer.current);
+          solTypeTimer.current = null;
+          setSolLoading(false);
+          setSolDone(true);
+          setSolError(err.message);
+          if (solBufRef.current) {
+            solShownRef.current = solBufRef.current.length;
+            setSolution(solBufRef.current);
+          }
+        }
+      };
+
+      const handleCopy = () => {
+        if (!solution) return;
+        navigator.clipboard.writeText(solution).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1800);
+        });
+      };
+
+      /* Main submit handler */
+      const handleSubmit = async () => {
+        if (!code.trim())    { setError('Paste some code first, damn it.'); return; }
+        if (!apiKey.trim())  { setError('Enter your Anthropic API key.');   return; }
+
+        setError('');
+        setLoading(true);
+        setDone(false);
+        setReview('');
+        bufRef.current   = '';
+        shownRef.current = 0;
+
+        clearInterval(solKernelTimer.current);
+        clearInterval(solTypeTimer.current);
+        solTypeTimer.current = null;
+        setSolution('');
+        setSolDone(false);
+        setSolError('');
+        setSolLoading(false);
+        solBufRef.current   = '';
+        solShownRef.current = 0;
+
+        /* Kernel message rotation */
+        let ki = 0;
+        setKernelIdx(0);
+        kernelTimer.current = setInterval(() => {
+          ki = (ki + 1) % KERNEL_MSGS.length;
+          setKernelIdx(ki);
+        }, 480);
+
+        try {
+          const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'Content-Type':                          'application/json',
+              'x-api-key':                             apiKey,
+              'anthropic-version':                     '2023-06-01',
+              'anthropic-dangerous-direct-browser-access': 'true',
+            },
+            body: JSON.stringify({
+              model:      'claude-sonnet-4-20250514',
+              max_tokens: 512,
+              stream:     true,
+              system:     SYSTEM_PROMPT,
+              messages: [{
+                role:    'user',
+                content: lang
+                  ? `Review this ${lang} code:\n\n\`\`\`\n${code}\n\`\`\``
+                  : `Review this code:\n\n\`\`\`\n${code}\n\`\`\``,
+              }],
+            }),
+          });
+
+          clearInterval(kernelTimer.current);
+
+          if (!res.ok) {
+            let msg = `HTTP ${res.status}`;
+            try { const e = await res.json(); msg = e.error?.message || msg; } catch {}
+            throw new Error(msg);
+          }
+
+          setLoading(false);
+          startTypewriter();
+
+          const reader  = res.body.getReader();
+          const decoder = new TextDecoder();
+          let   partial = '';
+
+          while (true) {
+            const { done: eof, value } = await reader.read();
+            if (eof) break;
+
+            partial += decoder.decode(value, { stream: true });
+            const lines = partial.split('\n');
+            partial = lines.pop(); // preserve incomplete line
+
+            for (const line of lines) {
+              if (!line.startsWith('data: ')) continue;
+              const raw = line.slice(6).trim();
+              if (raw === '[DONE]') continue;
+              try {
+                const j = JSON.parse(raw);
+                if (j.type === 'content_block_delta' && j.delta?.type === 'text_delta')
+                  bufRef.current += j.delta.text;
+              } catch {}
+            }
+          }
+
+          /* Wait for typewriter to drain the buffer, then flush */
+          const waitThenFlush = () => {
+            if (shownRef.current >= bufRef.current.length) flushTypewriter();
+            else setTimeout(waitThenFlush, 80);
+          };
+          waitThenFlush();
+
+        } catch (err) {
+          clearInterval(kernelTimer.current);
+          clearInterval(typeTimer.current);
+          typeTimer.current = null;
+          setLoading(false);
+          setDone(true);
+          setError(err.message);
+          if (bufRef.current) {
+            shownRef.current = bufRef.current.length;
+            setReview(bufRef.current);
+          }
+        }
+      };
+
+      /* TTS */
+      const handleReadAloud = () => {
+        if (!review) return;
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.cancel();
+          setSpeaking(false);
+          return;
+        }
+        const utt   = new SpeechSynthesisUtterance(review);
+        utt.rate    = 0.85;
+        utt.pitch   = 0.7;
+        utt.volume  = 1;
+        utt.onstart = () => setSpeaking(true);
+        utt.onend   = () => setSpeaking(false);
+        utt.onerror = () => setSpeaking(false);
+        window.speechSynthesis.speak(utt);
+      };
+
+      /* Cleanup on unmount */
+      useEffect(() => () => {
+        clearInterval(kernelTimer.current);
+        clearInterval(typeTimer.current);
+        clearInterval(solKernelTimer.current);
+        clearInterval(solTypeTimer.current);
+        window.speechSynthesis?.cancel();
+      }, []);
+
+      /* ── Render ─────────────────────────────────────────────────────────── */
+      return (
+        <div className="flicker" style={{
+          minHeight: '100vh',
+          background: '#030803',
+          maxWidth: '860px',
+          margin: '0 auto',
+          padding: '28px 20px 60px',
+        }}>
+
+          {/* ── SESSION ── */}
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: '12px',
+            marginBottom: '16px',
+            padding: '10px 14px',
+            border: '1px solid #003300',
+            background: '#050d05',
+            fontSize: '11px',
+            color: '#005500',
+          }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              session: {session.user.email || session.user.id}
+            </span>
+            <button
+              type="button"
+              onClick={onSignOut}
+              style={{
+                flexShrink: 0,
+                background: 'transparent',
+                border: '1px solid #663300',
+                color: '#cc8844',
+                fontFamily: 'inherit',
+                fontSize: '10px',
+                letterSpacing: '1px',
+                cursor: 'pointer',
+                padding: '5px 12px',
+              }}
+            >
+              [ SIGN OUT ]
+            </button>
+          </div>
+
+          {/* ── HEADER ── */}
+          <header style={{
+            border: '2px solid #00ff41',
+            background: 'linear-gradient(180deg, #011601 0%, #010d01 100%)',
+            padding: '22px 28px',
+            marginBottom: '28px',
+            textAlign: 'center',
+            boxShadow: '0 0 50px rgba(0, 255, 65, 0.12), inset 0 0 50px rgba(0, 0, 0, 0.6)',
+            position: 'relative',
+            overflow: 'hidden',
+          }}>
+            {/* Decorative scanline stripe */}
+            <div style={{
+              position: 'absolute', top: 0, left: 0, right: 0, height: '2px',
+              background: 'linear-gradient(90deg, transparent, #00ff41, transparent)',
+              opacity: 0.6,
+            }} />
+            <div style={{ color: '#003300', fontSize: '10px', letterSpacing: '1px', marginBottom: '6px', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              {'━'.repeat(120)}
+            </div>
+            <p style={{ color: '#006600', fontSize: '10px', letterSpacing: '2px', marginBottom: '10px', margin: '0 0 10px' }}>
+              KERNEL PANIC — NOT SYNCING: VFS UNABLE TO MOUNT ROOT FS ON /DEV/CODE
+            </p>
+            <h1 className="glow-green" style={{
+              color: '#00ff41',
+              fontSize: 'clamp(18px, 4.5vw, 42px)',
+              fontWeight: 700,
+              letterSpacing: '6px',
+              margin: '10px 0 8px',
+              lineHeight: 1.05,
+            }}>
+              LINUS REVIEWS YOUR CODE
+            </h1>
+            <p style={{ color: '#004d00', fontSize: '11px', letterSpacing: '3px', margin: '8px 0 6px' }}>
+              v2.6.32-hardened-rc7 &nbsp;|&nbsp; BRUTAL_HONESTY=1 &nbsp;|&nbsp; NO_MERCY=1 &nbsp;|&nbsp; SUGAR_COATING=0
+            </p>
+            <div style={{ color: '#003300', fontSize: '10px', letterSpacing: '1px', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+              {'━'.repeat(120)}
+            </div>
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0, height: '2px',
+              background: 'linear-gradient(90deg, transparent, #00ff41, transparent)',
+              opacity: 0.6,
+            }} />
+          </header>
+
+          {/* ── API KEY ── */}
+          <div style={{ marginBottom: '22px' }}>
+            <label style={{ display: 'block', color: '#005500', fontSize: '11px', marginBottom: '7px', letterSpacing: '0.5px' }}>
+              root@torvalds:~# export ANTHROPIC_API_KEY=<span className="blink" style={{ color: '#00ff41' }}>_</span>
+            </label>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              placeholder="sk-ant-api03-..."
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                background: '#070d07',
+                color: '#00ff41',
+                border: '1px solid #003300',
+                fontFamily: 'inherit',
+                fontSize: '13px',
+                transition: 'border-color 0.2s, box-shadow 0.2s',
+              }}
+              onFocus={e => { e.target.style.borderColor = '#00aa22'; e.target.style.boxShadow = '0 0 12px rgba(0,255,65,0.15)'; }}
+              onBlur={e  => { e.target.style.borderColor = '#003300'; e.target.style.boxShadow = 'none'; }}
+            />
+          </div>
+
+          {/* ── CODE INPUT ── */}
+          <div style={{ marginBottom: '22px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '7px' }}>
+              <span style={{ color: '#005500', fontSize: '11px' }}>
+                root@torvalds:~# cat &gt; /tmp/review_candidate.c
+              </span>
+              {lang && (
+                <span style={{
+                  color: '#00cc44', fontSize: '10px', letterSpacing: '1.5px',
+                  border: '1px solid #005500', padding: '2px 10px', background: '#011201',
+                }}>
+                  DETECTED: {lang}
+                </span>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', border: '1px solid #003300', background: '#050d05', overflow: 'hidden' }}>
+              {/* Line numbers */}
+              <div
+                ref={lineNumsRef}
+                style={{
+                  background: '#030803',
+                  borderRight: '1px solid #002200',
+                  padding: '12px 8px 12px 4px',
+                  userSelect: 'none',
+                  overflowY: 'hidden',
+                  minWidth: '46px',
+                  textAlign: 'right',
+                  flexShrink: 0,
+                }}
+              >
+                {Array.from({ length: lineCount }, (_, i) => (
+                  <div key={i} style={{ color: '#1a4d1a', fontSize: '12px', lineHeight: '1.6', fontFamily: 'inherit' }}>
+                    {i + 1}
+                  </div>
+                ))}
+              </div>
+
+              {/* Textarea */}
+              <textarea
+                ref={textareaRef}
+                value={code}
+                onChange={e => setCode(e.target.value)}
+                onScroll={syncScroll}
+                placeholder="Paste your garbage here."
+                rows={15}
+                spellCheck={false}
+                autoComplete="off"
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: 'transparent',
+                  color: '#00ff41',
+                  border: 'none',
+                  fontFamily: 'inherit',
+                  fontSize: '13px',
+                  lineHeight: '1.6',
+                  resize: 'vertical',
+                  tabSize: 2,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* ── SUBMIT ── */}
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="btn-roast"
+            style={{
+              width: '100%',
+              padding: '16px',
+              fontSize: '15px',
+              fontWeight: 700,
+              background:   loading ? '#160000' : '#6b0000',
+              color:        loading ? '#551111' : '#ff3333',
+              border:       `2px solid ${loading ? '#3a0000' : '#cc0000'}`,
+              marginBottom: '22px',
+              cursor:       loading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {loading ? '[ PROCESSING — DO NOT INTERRUPT THE KERNEL ]' : '[ SUBMIT FOR ROASTING ]'}
+          </button>
+
+          {/* ── ERROR ── */}
+          {error && (
+            <div style={{
+              color: '#ff4444',
+              border: '1px solid #660000',
+              padding: '10px 14px',
+              marginBottom: '20px',
+              fontSize: '12px',
+              background: '#0d0000',
+              letterSpacing: '0.5px',
+            }}>
+              ✗ &nbsp;ERROR: {error}
+            </div>
+          )}
+
+          {/* ── KERNEL BOOT LOG ── */}
+          {loading && (
+            <div className="panel" style={{ padding: '18px 22px', marginBottom: '22px' }}>
+              <div style={{ color: '#004d00', fontSize: '10px', marginBottom: '10px', letterSpacing: '1px' }}>
+                [ kernel: linus_review_0 ] dmesg — live output:
+              </div>
+              {KERNEL_MSGS.map((msg, i) => (
+                <div
+                  key={i}
+                  className={i === kernelIdx ? 'kmsg-active' : 'kmsg-inactive'}
+                  style={{ fontSize: '12px', lineHeight: '1.9', fontFamily: 'inherit' }}
+                >
+                  {msg}
+                </div>
+              ))}
+              <div style={{ marginTop: '10px' }}>
+                <span className="blink" style={{ color: '#00ff41', fontSize: '14px' }}>█</span>
+              </div>
+            </div>
+          )}
+
+          {/* ── REVIEW OUTPUT ── */}
+          {review && (
+            <div className="panel-hot" style={{ marginBottom: '22px', overflow: 'hidden' }}>
+              {/* Title bar */}
+              <div style={{
+                background: '#011a01',
+                borderBottom: '1px solid #004400',
+                padding: '8px 16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}>
+                <span style={{ color: '#005500', fontSize: '11px', letterSpacing: '0.5px' }}>
+                  /dev/linus/opinions — stdout — UNRESTRICTED
+                </span>
+                <span style={{ color: '#003300', fontSize: '10px' }}>
+                  {done
+                    ? `${review.trim().split(/\s+/).length} words`
+                    : 'streaming…'}
+                </span>
+              </div>
+
+              {/* Review text */}
+              <div
+                className={!done ? 'cursor-blink' : ''}
+                style={{
+                  padding: '22px',
+                  color: '#00ff41',
+                  fontSize: '14px',
+                  lineHeight: '1.85',
+                  whiteSpace: 'pre-wrap',
+                  minHeight: '80px',
+                  letterSpacing: '0.2px',
+                }}
+              >
+                {review}
+              </div>
+
+              {/* TTS controls */}
+              {done && (
+                <div style={{
+                  borderTop: '1px solid #002800',
+                  padding: '12px 22px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '18px',
+                  background: '#010d01',
+                  flexWrap: 'wrap',
+                }}>
+                  <button
+                    onClick={handleReadAloud}
+                    style={{
+                      padding: '7px 18px',
+                      fontSize: '11px',
+                      background: 'transparent',
+                      color:  speaking ? '#ffaa00' : '#00ff41',
+                      border: `1px solid ${speaking ? '#ffaa00' : '#00ff41'}`,
+                      fontFamily: 'inherit',
+                      cursor: 'pointer',
+                      letterSpacing: '1.5px',
+                      transition: 'all 0.2s',
+                    }}
+                    onMouseEnter={e => { if (!speaking) { e.currentTarget.style.background = 'rgba(0,255,65,0.07)'; e.currentTarget.style.boxShadow = '0 0 10px rgba(0,255,65,0.2)'; } }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.boxShadow = 'none'; }}
+                  >
+                    {speaking ? '[ STOP ]' : '[ READ IT TO ME ]'}
+                  </button>
+
+                  <button
+                    onClick={handleSuggestSolution}
+                    disabled={solLoading}
+                    className="btn-fix"
+                    style={{
+                      padding: '7px 18px',
+                      fontSize: '11px',
+                      background:  solLoading ? 'rgba(255,179,0,0.04)' : 'transparent',
+                      color:       solLoading ? '#6b5000'              : '#ffb300',
+                      border:      `1px solid ${solLoading ? '#4d3800' : '#ffb300'}`,
+                      fontFamily:  'inherit',
+                      cursor:      solLoading ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    {solLoading ? '[ REWRITING... ]' : solDone ? '[ REGENERATE FIX ]' : '[ SHOW ME HOW IT\'S DONE ]'}
+                  </button>
+
+                  {speaking && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      {/* Equaliser bars */}
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: '20px' }}>
+                        {[12, 18, 8, 16, 10, 20, 14].map((h, i) => (
+                          <span
+                            key={i}
+                            className="eq-bar"
+                            style={{ height: `${h}px`, animationDelay: `${i * 0.07}s` }}
+                          />
+                        ))}
+                      </div>
+                      <span style={{ color: '#00aa22', fontSize: '11px', letterSpacing: '1.5px' }}>
+                        SPEAKING...
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {(solLoading || solution) && (
+            <div ref={solPanelRef}>
+              <div className="section-divider">
+                ▼ &nbsp; LINUS REWRITES IT &nbsp; ▼
+              </div>
+
+              <div className="panel-amber" style={{ overflow: 'hidden' }}>
+                <div style={{
+                  background: '#0d0900',
+                  borderBottom: '1px solid #4d3800',
+                  padding: '9px 16px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ color: '#996600', fontSize: '10px' }}>◈</span>
+                    <span style={{ color: '#8a6200', fontSize: '11px', letterSpacing: '0.5px' }}>
+                      /dev/linus/solution{lang ? `.${lang.toLowerCase().replace(/[^a-z]/g, '')}` : ''} — THE RIGHT WAY
+                    </span>
+                  </div>
+                  <span style={{ color: '#4d3800', fontSize: '10px' }}>
+                    {solDone
+                      ? `${solution.split('\n').length} lines`
+                      : 'rewriting…'}
+                  </span>
+                </div>
+
+                {solLoading && (
+                  <div style={{ padding: '18px 22px', borderBottom: '1px solid #2a1a00' }}>
+                    <div style={{ color: '#4d3800', fontSize: '10px', marginBottom: '10px', letterSpacing: '1px' }}>
+                      [ kernel: linus_rewrite_0 ] dmesg — live output:
+                    </div>
+                    {SOLUTION_MSGS.map((msg, i) => (
+                      <div
+                        key={i}
+                        className={i === solKernelIdx ? 'kmsg-active-amber' : 'kmsg-inactive-amber'}
+                        style={{ fontSize: '12px', lineHeight: '1.9', fontFamily: 'inherit' }}
+                      >
+                        {msg}
+                      </div>
+                    ))}
+                    <div style={{ marginTop: '10px' }}>
+                      <span className="blink" style={{ color: '#ffb300', fontSize: '14px' }}>█</span>
+                    </div>
+                  </div>
+                )}
+
+                {solError && (
+                  <div style={{
+                    color: '#ff6644',
+                    borderBottom: '1px solid #440000',
+                    padding: '10px 16px',
+                    fontSize: '12px',
+                    background: '#0d0000',
+                  }}>
+                    ✗ &nbsp;ERROR: {solError}
+                  </div>
+                )}
+
+                {solution && (
+                  <div className="code-scroll">
+                    <div style={{ display: 'flex', minWidth: '100%' }}>
+                      <div style={{
+                        background: '#080500',
+                        borderRight: '1px solid #2a1a00',
+                        padding: '16px 8px 16px 4px',
+                        userSelect: 'none',
+                        flexShrink: 0,
+                        minWidth: '46px',
+                        textAlign: 'right',
+                      }}>
+                        {solution.split('\n').map((_, i) => (
+                          <div key={i} style={{
+                            color: '#3d2800',
+                            fontSize: '12px',
+                            lineHeight: '1.6',
+                            fontFamily: 'inherit',
+                          }}>
+                            {i + 1}
+                          </div>
+                        ))}
+                      </div>
+
+                      <pre
+                        className={!solDone ? 'cursor-blink-amber' : ''}
+                        style={{
+                          flex: 1,
+                          margin: 0,
+                          padding: '16px 18px',
+                          background: 'transparent',
+                          color: '#ffb300',
+                          fontFamily: 'inherit',
+                          fontSize: '13px',
+                          lineHeight: '1.6',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-all',
+                          tabSize: 2,
+                        }}
+                      >
+                        {solution}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+
+                {solDone && solution && (
+                  <div style={{
+                    borderTop: '1px solid #2a1a00',
+                    padding: '10px 18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '14px',
+                    background: '#0a0700',
+                  }}>
+                    <button
+                      onClick={handleCopy}
+                      style={{
+                        padding: '6px 16px',
+                        fontSize: '11px',
+                        background:  copied ? 'rgba(255,179,0,0.12)' : 'transparent',
+                        color:       copied ? '#ffcc44'               : '#ffb300',
+                        border:      `1px solid ${copied ? '#ffcc44' : '#664400'}`,
+                        fontFamily:  'inherit',
+                        cursor:      'pointer',
+                        letterSpacing: '1.5px',
+                        transition:  'all 0.15s',
+                      }}
+                      onMouseEnter={e => { if (!copied) e.currentTarget.style.borderColor = '#ffb300'; }}
+                      onMouseLeave={e => { if (!copied) e.currentTarget.style.borderColor = '#664400'; }}
+                    >
+                      {copied ? '[ COPIED ✓ ]' : '[ COPY CODE ]'}
+                    </button>
+                    <span style={{ color: '#3d2800', fontSize: '10px', letterSpacing: '1px' }}>
+                      — study it. don't just paste it.
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── FOOTER QUOTE ── */}
+          <footer style={{
+            marginTop: '52px',
+            borderTop: '1px solid #002200',
+            paddingTop: '18px',
+            textAlign: 'center',
+            color: '#1c4d1c',
+            fontSize: '11px',
+            lineHeight: '1.7',
+          }}>
+            <span style={{ fontStyle: 'italic' }}>{quote}</span>
+            <br />
+            <span style={{ color: '#0d330d', fontSize: '10px', letterSpacing: '1px' }}>
+              — Linus Torvalds
+            </span>
+          </footer>
+
+        </div>
+      );
+    }
+
+    function mountApp() {
+      ReactDOM.createRoot(document.getElementById('root')).render(<Root />);
+    }
+    window.addEventListener('supabase:ready', mountApp);
+    if (window.__supabaseReady) mountApp();
+  </script>
+</body>
+</html>
